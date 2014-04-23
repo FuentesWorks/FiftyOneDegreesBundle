@@ -1182,6 +1182,7 @@ class FiftyOneDegrees
 
         $device_ids = array();
         //$device_data = array();
+        $this->deviceData = array();
 
         foreach ($profiles as $profile) {
             $device_ids[$profile['component_id']] = $profile['unique_id'];
