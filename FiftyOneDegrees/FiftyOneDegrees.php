@@ -1181,7 +1181,7 @@ class FiftyOneDegrees
         }
 
         $device_ids = array();
-        $device_data = array();
+        //$device_data = array();
 
         foreach ($profiles as $profile) {
             $device_ids[$profile['component_id']] = $profile['unique_id'];
@@ -1190,7 +1190,8 @@ class FiftyOneDegrees
                 $profile,
                 $properties,
                 $headers);
-            $this->deviceData = array_merge($device_data, $profile_values);
+            //$this->deviceData = array_merge($device_data, $profile_values);
+            $this->deviceData = array_merge($this->deviceData, $profile_values);
         }
         ksort($device_ids);
         $this->deviceData['DeviceId'] = implode('-', $device_ids);
