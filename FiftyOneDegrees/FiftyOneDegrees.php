@@ -18,13 +18,13 @@ class FiftyOneDegrees
      * Controls if some objects are cached in an array.
      * Objects are cached by default. Set to FALSE to disable.
      */
-    private $USE_ARRAY_CACHE = TRUE;
+    private $USE_ARRAY_CACHE = true;
 
     /**
      * Controls if property values are set to their typed values or strings.
      * Defaults to TRUE, set to FALSE to disable.
      */
-    private $RETURN_STRINGS = FALSE;
+    private $RETURN_STRINGS = true;
 
     /**
      * Controls the file path that data is read from.
@@ -293,7 +293,7 @@ class FiftyOneDegrees
         $this->timings['profile_fetch_time'] = microtime(TRUE) - $this->timings['profile_fetch_time'];
 
         $this->timings['property_fetch_time'] = microtime(TRUE);
-        $this->deviceData = $this->getPropertyData($profiles, $headers);
+        $this->deviceData = $this->getPropertyData($profiles, $headers); // Initialize deviceData array
         $bandwidth = $this->getBandwidthData();
         if ($bandwidth != NULL) {
             foreach ($bandwidth as $k => $v) {
@@ -306,7 +306,7 @@ class FiftyOneDegrees
         }
         $this->timings['property_fetch_time'] = microtime(TRUE) - $this->timings['property_fetch_time'];
         $end_time = microtime(TRUE);
-        $duration = $end_time - $start_time;
+        //$duration = $end_time - $start_time;
         $this->deviceData['Time'] = $end_time - $start_time;
         $this->deviceData['debug_timings'] = $this->timings;
         $this->deviceData['debug_info'] = $this->debugInfo;
@@ -1181,8 +1181,7 @@ class FiftyOneDegrees
         }
 
         $device_ids = array();
-        //$device_data = array();
-        $this->deviceData = array();
+        $device_data = array();
 
         foreach ($profiles as $profile) {
             $device_ids[$profile['component_id']] = $profile['unique_id'];
@@ -1192,12 +1191,12 @@ class FiftyOneDegrees
                 $properties,
                 $headers);
             //$this->deviceData = array_merge($device_data, $profile_values);
-            $this->deviceData = array_merge($this->deviceData, $profile_values);
+            $device_data = array_merge($device_data, $profile_values);
         }
         ksort($device_ids);
-        $this->deviceData['DeviceId'] = implode('-', $device_ids);
+        $device_data['DeviceId'] = implode('-', $device_ids);
 
-        return $this->deviceData;
+        return $device_data;
     }
 
     public function getProfilePropertyValues($profile, $needed_properties, $headers) {
@@ -1392,9 +1391,20 @@ class FiftyOneDegrees
      *   TRUE if this property is needed.
      */
     private function isNeededProperty($property) {
+        /* Unreadable:
         $is_set = isset($this->NEEDED_PROPERTIES);
         return $is_set === FALSE || ($is_set === TRUE
             && in_array($property['name'], $this->NEEDED_PROPERTIES));
+        */
+
+        /* Readable: */
+        if(!isset($this->NEEDED_PROPERTIES) || !$this->NEEDED_PROPERTIES) {
+            // No needed properties where specified, therefore ALL properties are needed
+            return true;
+        } else {
+            // Needed properties is not set, then check
+            return in_array($property['name'], $this->NEEDED_PROPERTIES);
+        }
     }
 
     /**
