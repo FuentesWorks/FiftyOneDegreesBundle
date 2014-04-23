@@ -1,0 +1,6 @@
+parameters:
+    fiftyonedegrees.class: FuentesWorks\FiftyOneDegreesBundle\Service\FiftyOneDegreesWrapper
+
+services:
+    fiftyonedegrees:
+        class: %fiftyonedegrees.class%

@@ -1,0 +1,23 @@
+{
+    "name": "fuentesworks/fiftyonedegrees-bundle",
+    "type": "symfony-bundle",
+    "description": "A simple Symfony2 bundle for the beta API for FiftyOneDegrees mobile detection.",
+    "keywords": ["FiftyOneDegrees"],
+    "homepage": "https://github.com/FuentesWorks/FiftyOneDegreesBundle",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Edmundo Fuentes",
+            "email": "me@edmundofuentes.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=5.3.2",
+        "symfony/framework-bundle": ">=2.1"
+    },
+    "autoload": {
+        "psr-0": { "FuentesWorks\\FiftyOneDegreesBundle": "" }
+    },
+    "target-dir": "FuentesWorks/FiftyOneDegreesBundle"
+}
