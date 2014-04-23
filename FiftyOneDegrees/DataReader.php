@@ -39,6 +39,8 @@ class DataReader
      */
     public function __construct($dataFilePath)
     {
+        $this->dataFilePath = $dataFilePath;
+
         if(!file_exists($dataFilePath) || !is_readable($dataFilePath))
         {
             throw new \RuntimeException("Could not open the data file.");
