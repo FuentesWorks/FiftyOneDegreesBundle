@@ -56,7 +56,7 @@ class DataReader
      * @throws \RuntimeException
      */
     private function setDataOffset($offset = 0) {
-        if ($this->dataFile == NULL) {
+        if ($this->dataFile === false) {
             //die('A 51Degrees data file has not been set.');
             throw new \RuntimeException('A 51Degrees data file has not been set.');
         }
