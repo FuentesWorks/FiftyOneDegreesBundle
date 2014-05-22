@@ -149,6 +149,12 @@ class FiftyOneDegrees
 
     }
 
+    public function __destruct()
+    {
+        unset($this->dataReader);
+        unset($this->cache);
+    }
+
     /**
      * Set a specific configuration option
      *
