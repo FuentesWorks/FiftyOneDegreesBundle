@@ -11,9 +11,4 @@ class FiftyOneDegreesWrapper extends FiftyOneDegrees
         parent::__construct($data_file_path);
     }
 
-    public function createInstance($data_file_path=null)
-    {
-        return new FiftyOneDegrees($data_file_path);
-    }
-
 }
