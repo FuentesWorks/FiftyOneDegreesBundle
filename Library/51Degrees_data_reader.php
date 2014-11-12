@@ -1,4 +1,24 @@
 <?php
+/* *********************************************************************
+ * This Source Code Form is copyright of 51Degrees Mobile Experts Limited. 
+ * Copyright 2014 51Degrees Mobile Experts Limited, 5 Charlotte Close,
+ * Caversham, Reading, Berkshire, United Kingdom RG4 7BY
+ * 
+ * This Source Code Form is the subject of the following patent 
+ * applications, owned by 51Degrees Mobile Experts Limited of 5 Charlotte
+ * Close, Caversham, Reading, Berkshire, United Kingdom RG4 7BY: 
+ * European Patent Application No. 13192291.6; and 
+ * United States Patent Application Nos. 14/085,223 and 14/085,301.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0.
+ * 
+ * If a copy of the MPL was not distributed with this file, You can obtain
+ * one at http://mozilla.org/MPL/2.0/.
+ * 
+ * This Source Code Form is "Incompatible With Secondary Licenses", as
+ * defined by the Mozilla Public License, v. 2.0.
+ * ********************************************************************* */
 
 /**
  * @file
@@ -10,18 +30,17 @@ require_once 'LinkedList.php';
 
 global $_fiftyone_degrees_data_file_path;
 if (isset($_fiftyone_degrees_data_file_path) == FALSE) {
-  $_fiftyone_degrees_data_file_path = '51Degrees-Lite.dat';
+  $_fiftyone_degrees_data_file_path = dirname(__FILE__) . '/51Degrees-Lite.dat';
 }
 
 function fiftyone_degrees_set_file_handle() {
   global $_fiftyone_degrees_data_file;
   global $_fiftyone_degrees_data_file_path;
   if (!file_exists($_fiftyone_degrees_data_file_path)) {
-    $_fiftyone_degrees_data_file = fopen('51Degrees-Lite.dat', 'rb');
+    $_fiftyone_degrees_data_file_path = dirname(__FILE__) . '/51Degrees-Lite.dat';
   }
-  else {
-    $_fiftyone_degrees_data_file = fopen($_fiftyone_degrees_data_file_path, 'rb');
-  }
+  $_fiftyone_degrees_data_file = fopen($_fiftyone_degrees_data_file_path, 'rb');
+  
 }
 
 /**
@@ -37,7 +56,7 @@ function fiftyone_degrees_get_device_data($useragent) {
   global $_fiftyone_degrees_use_array_caching;
   global $_fiftyone_degrees_data_file;
   fiftyone_degrees_set_file_handle();
-  
+
   $debug_info = array();
   $start_time = microtime(TRUE);
 
@@ -51,12 +70,13 @@ function fiftyone_degrees_get_device_data($useragent) {
   $headers = fiftyone_degrees_get_headers();
 
   $root_char_nodes = fiftyone_degrees_read_root_node_offsets($headers);
+  $root_char_nodes_count = count($root_char_nodes);
 
   // Unpack creates a 1 based array. array merge converts to 0 based.
   $useragent_bytes = array_merge(unpack('C*', $useragent));
 
   $useragent_length = count($useragent_bytes);
-  $current_position = count($useragent_bytes) - 1;
+  $current_position = min($useragent_length, $root_char_nodes_count) - 1;
 
   $matched_node_indexs = array();
   $debug_info['root_nodes_evaluated'] = 0;
@@ -65,7 +85,7 @@ function fiftyone_degrees_get_device_data($useragent) {
   $debug_info['signatures_read'] = 0;
   $debug_info['signatures_compared'] = 0;
   $debug_info['difference'] = 0;
-  
+
   while ($current_position > 0) {
     $node = fiftyone_degrees_read_node(
       $root_char_nodes[$current_position],
@@ -129,7 +149,6 @@ function fiftyone_degrees_get_device_data($useragent) {
     $best_signature,
     $headers);
 
-  //$info['UserAgent'] = $ua;
   $info['Confidence'] = $lowest_score;
 
   $profiles = array();
@@ -165,7 +184,7 @@ function fiftyone_degrees_get_device_data($useragent) {
       $_51d[$k] = $v;
     }
   }
-  
+
   foreach ($info as $i_k => $i_v) {
     $_51d[$i_k] = $i_v;
   }
@@ -197,10 +216,6 @@ function fiftyone_degrees_get_complete_numeric_node(
     $useragent_bytes,
     $debug_info,
     $headers);
-  $next_offset = 0;
-  if ($next_node !== -1) {
-    $next_offset = $next_node;
-  }
   if ($next_node !== -1) {
     $next_node = fiftyone_degrees_read_node($next_node, $headers);
     $complete_node = fiftyone_degrees_get_complete_numeric_node(
@@ -211,9 +226,6 @@ function fiftyone_degrees_get_complete_numeric_node(
       $debug_info,
       $headers);
   }
-  //$complete_node_offset = -1;
-  //if ($complete_node != NULL)
-  //  $complete_node_offset = $complete_node['offset'];
   if ($complete_node == NULL && $node['numeric_children_count'] > 0) {
     // No. So try each of the numeric matches in ascending order of
     // difference.
@@ -485,7 +497,7 @@ function fiftyone_degrees_evaluate_numeric_nodes(
         $lowest_score,
         $debug_info,
         $headers);
-      
+
 
       if ($node != NULL
       && fiftyone_degrees_get_any_nodes_overlap($node, $node_offsets, $headers)) {
@@ -563,10 +575,12 @@ function fiftyone_degrees_get_signature(
   &$timings,
   &$debug_info,
   &$headers) {
+
   $matched_signature = fiftyone_degrees_signature_binary_seach(
     $matched_node_indexs,
     $debug_info,
     $headers);
+
   if ($matched_signature < 0) {
     $timings['numeric_match_time'] = microtime(TRUE);
     // No. So find any other nodes that match if numeric differences
@@ -584,7 +598,7 @@ function fiftyone_degrees_get_signature(
     $matched_numeric_nodes,
     $debug_info,
     $headers);
-    
+
     $timings['numeric_match_time'] = microtime(TRUE) - $timings['numeric_match_time'];
 
     if ($matched_signature >= 0) {
@@ -592,22 +606,26 @@ function fiftyone_degrees_get_signature(
       $method = 'numeric';
       return $matched_signature;
     }
-    
+    $timings['get_closest_sigs_time'] = microtime(TRUE);;
     if (count($matched_node_indexs) > 0) {
-      $signatures = fiftyone_degrees_get_closest_signature_indexs(
+      $sig_indexs = fiftyone_degrees_get_closest_signature_indexs(
         $matched_node_indexs,
         $timings,
         $debug_info,
         $headers);
-      $signatures = array_splice($signatures, 0, $headers['info']['maximum_patterns']);
-
-      // See Controller.EvaluateSignatures(Match match, List<Signature> signatures)
-      // for .NET implementation
-
+      $ranked_sig_indexs = array_splice($sig_indexs, 0, $headers['info']['max_signatures']);
+      $timings['get_closest_sigs_time'] = microtime(TRUE) - $timings['get_closest_sigs_time'];
+      $timings['get_sig_from_rank_time'] = microtime(TRUE);
+      $signatures = array();
+      foreach($ranked_sig_indexs as $s) {
+        $signatures[] = fiftyone_degrees_get_ranked_signature_related_offset($s, $headers);
+      }
+      $timings['get_sig_from_rank_time'] = microtime(TRUE) - $timings['get_sig_from_rank_time'];
+      
       // Store the score that we've got from the numeric difference
       // calculations.
       $starting_score = $lowest_score;
-      
+      $timings['eval_nearest_sigs_time'] = microtime(TRUE);
       $matched_signature = fiftyone_degrees_evaluate_signatures(
         $matched_numeric_nodes,
         $signatures,
@@ -616,12 +634,12 @@ function fiftyone_degrees_get_signature(
         $timings,
         $debug_info,
         $headers);
-      
+
       $method = 'nearest';
-      
+      $timings['eval_nearest_sigs_time'] = microtime(TRUE) - $timings['eval_nearest_sigs_time'];
       if($matched_signature === NULL) {
         $method = 'closest';
-
+        $timings['eval_closest_sigs_time'] = microtime(TRUE);
         $matched_signature = fiftyone_degrees_evaluate_signatures(
           $matched_numeric_nodes,
           $signatures,
@@ -633,22 +651,22 @@ function fiftyone_degrees_get_signature(
         // Increase the lowest score by the starting value.
         $lowest_score += $starting_score;
         $debug_info['difference'] = $lowest_score;
-        
-        // Use default
-        /*if ($matched_signature === NULL) {
-        
-        }*/
+        $timings['eval_closest_sigs_time'] = microtime(TRUE) - $timings['eval_closest_sigs_time'];
       }
-    }
-    if($matched_signature === NULL) {
-      $method = 'none';
     }
   }
   else {
     $method = 'exact';
   }
-
   return $matched_signature;
+}
+
+function fiftyone_degrees_get_ranked_signature_related_offset($ranked_sig, $headers) {
+  global $_fiftyone_degrees_data_file;
+  $_fiftyone_degrees_data_file
+    = fiftyone_degrees_get_data_file($headers['ranked_signatures_offset'] + ($ranked_sig * 4));
+  $index =fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
+  return $index;
 }
 
 function fiftyone_degrees_evaluate_signatures(
@@ -665,9 +683,9 @@ function fiftyone_degrees_evaluate_signatures(
   else
     $time_name = 'nearest_match_evaluate_signatures';
   $timings[$time_name] = microtime(TRUE);
-  
+
   $matched_signature = NULL;
-  
+
   $lowest_score = PHP_INT_MAX;
   $last_node_offset = $matched_nodes[count($matched_nodes) - 1];
   $last_node_root = fiftyone_degrees_get_nodes_root_node($last_node_offset, $headers);
@@ -682,7 +700,6 @@ function fiftyone_degrees_evaluate_signatures(
       $is_closest,
       $debug_info,
       $headers);
-
     if ($result === TRUE) {
       $matched_signature = $signature;
     }
@@ -740,7 +757,7 @@ function fiftyone_degrees_evaluate_signature(
   $signature = fiftyone_degrees_read_signature($signature_index, $headers);
 
   $debug_info['signatures_compared']++;
-  
+
   $score = fiftyone_degrees_get_signature_score (
     $signature,
     $matched_nodes,
@@ -775,16 +792,16 @@ function fiftyone_degrees_get_signature_score (
   $headers) {
   $sig_length = fiftyone_degrees_get_signature_length($signature, $headers);
   if ($is_closest === TRUE)
-    $score = abs($last_node_character + 1 - $sig_length);
+    $running_score = abs($last_node_character + 1 - $sig_length);
   else
-    $score = 0;
+    $running_score = 0;
 
   // We only need to check the nodes that are different. As the nodes
   // are in the same order we can simply look for those that are different.
   $match_node_index = 0;
   $signature_node_index = 0;
   while ($signature_node_index < count($signature['node_indexs'])
-  && $score < $lowest_score) {
+  && $running_score < $lowest_score) {
     $match_node_offset = $match_node_index >= count($node_offsets)
       ? PHP_INT_MAX : $node_offsets[$match_node_index];
     $signature_node_offset = $signature['node_indexs'][$signature_node_index];
@@ -793,18 +810,23 @@ function fiftyone_degrees_get_signature_score (
       // the current signature node. The signature node is not contained
       // in the match so we must score it.
       if ($is_closest) {
-        $score += fiftyone_degrees_get_score(
+        $score = fiftyone_degrees_get_score(
           $signature['node_indexs'][$signature_node_index],
           $useragent_bytes,
           $lowest_score,
           $headers);
       }
       else {
-        $score += fiftyone_degrees_get_nearest_score(
+        $score = fiftyone_degrees_get_nearest_score(
           $signature['node_indexs'][$signature_node_index],
           $useragent_bytes,
           $headers);
+        
       }
+      if ($score < 0) {
+        return PHP_INT_MAX;
+      }
+      $running_score += $score;
       $signature_node_index++;
     }
     else if ($match_node_offset == $signature_node_offset) {
@@ -819,7 +841,7 @@ function fiftyone_degrees_get_signature_score (
     }
   }
 
-  return $score;
+  return $running_score;
 }
 
 /**
@@ -830,7 +852,7 @@ function fiftyone_degrees_get_nearest_score(
   $node_index,
   $useragent_bytes,
   $headers) {
-  
+
   $node = fiftyone_degrees_read_node($node_index, $headers);
   $index = fiftyone_degrees_get_node_index_in_string($node, $useragent_bytes, $headers);
   if ($index >= 0)
@@ -854,7 +876,7 @@ function fiftyone_degrees_get_node_index_in_string($node, $useragent_bytes, $hea
     for ($node_index = 0, $target_index = $index; 
       $node_index < $char_count && $target_index < $ua_count; 
       $node_index++, $target_index++) {
-      
+
       if ($characters[$node_index] != $useragent_bytes[$target_index])
           break;
       else if ($node_index == $final_index)
@@ -981,7 +1003,7 @@ function fiftyone_degrees_get_numeric_difference(
 function fiftyone_degrees_get_nodes_overlap($node, $compare_node, $headers) {
   $low_node = $node['position'] < $compare_node['position'] ? $node : $compare_node;
   $high_node = $low_node['position'] == $node['position'] ? $compare_node : $node;
-  
+
   $low_root_node = fiftyone_degrees_get_nodes_root_node($low_node['offset'], $headers);
   return $low_node['position'] == $high_node['position']
     || $low_root_node['position'] > $high_node;
@@ -1132,7 +1154,7 @@ function fiftyone_degrees_get_property_data($profiles, $headers) {
   ksort($device_ids);
   $_51d['DeviceId'] = implode('-', $device_ids);
 
-  
+
   return $_51d;
 }
 
@@ -1313,7 +1335,7 @@ function fiftyone_degrees_get_typed_value($property, $profile_value) {
       return (double) $value_string;
     // Bool.
     case 3:
-      return (bool) $value_string;
+      return $value_string === 'True';
   }
 }
 
@@ -1376,74 +1398,84 @@ function fiftyone_degrees_get_closest_signature_indexs(
   &$debug_info,
   $headers) {
 
-  // Sort nodes in ascending order by signature count.
-  $sorted_nodes = array();
-  $nodes = array();
-
-  $max_count = 1;
-  $iteration = 2;
-
-  $timings['closest_match_node_sort_time'] = microtime(TRUE);
-
+  
   $node_count = count($node_indexs);
-  for ($i = 0; $i < $node_count; $i++) {
-    $node = fiftyone_degrees_read_node($node_indexs[$i], $headers);
-    
-    $sorted_nodes[$i] = $node['node_signature_count'];
-    
-    $nodes[] = $node;
-  }
-  array_multisort($sorted_nodes, SORT_DESC, $nodes);
-  $nodes = array_reverse($nodes);
-  $timings['closest_match_node_sort_time'] = microtime(TRUE) - $timings['closest_match_node_sort_time'];
-
-  $timings['closest_match_node_fill_signatures_time'] = microtime(TRUE);
-  for ($i = 0; $i < $node_count; $i++) {
-    fiftyone_degrees_fill_node_signatures($nodes[$i], $headers);
-  }
-  $timings['closest_match_node_fill_signatures_time'] = microtime(TRUE) - $timings['closest_match_node_fill_signatures_time'];
-
-  $timings['closest_match_filling_linked_list_time'] = microtime(TRUE);
-
-  // Building initial list.
-  $linked_list = new LinkedList();
-  if (count($nodes) > 0) {
-    $node_0_signatures_count = count($nodes[0]['node_signatures']);
-    for ($i = 0; $i < $node_0_signatures_count; $i++) {
-      $linked_list->addLast(array($nodes[0]['node_signatures'][$i], 1));
+  
+  if ($node_count == 1) {
+    // There is only 1 list so return that single list.
+    $node = fiftyone_degrees_read_node($node_indexs[0], $headers);
+    fiftyone_degrees_fill_node_ranked_signatures($node, $headers['info']['max_signatures']);
+    $sig_offsets = array();
+    foreach ($node['node_ranked_signatures'] as $offset) {
+      $sig_offsets[] = $offset;
     }
+    return $sig_offsets;
   }
+  else {
+    $timings['closest_match_node_sort_time'] = microtime(TRUE);  
+    $sorted_nodes = array();
+    $nodes = array();
 
-  // Count the number of times each signature index occurs.
-  for ($i = 1; $i < $node_count; $i++) {
-    $max_count = fiftyone_degrees_get_closest_signatures_for_node(
-      $node_count,
-      $nodes[$i]['node_signatures'],
-      $linked_list,
-      $max_count,
-      $iteration);
-    $iteration++;
-  }
-  $timings['closest_match_filling_linked_list_time'] = microtime(TRUE) - $timings['closest_match_filling_linked_list_time'];
-  $timings['closest_match_sorting_signature_ranks'] = microtime(TRUE);
-
-  $sig_offsets = array();
-  $ranks = array();
-  $linked_list->current = $linked_list->first;
-  while ($linked_list->current !== -1) {
-    if ($linked_list->current->value[1] == $max_count) {
-      $debug_info['signatures_read']++;
-      $signature = fiftyone_degrees_read_signature($linked_list->current->value[0], $headers);
-      $sig_offsets[] = $linked_list->current->value[0];
-      $ranks[] = $signature['rank'];
+    $max_count = 1;
+    $iteration = 2;
+    for ($i = 0; $i < $node_count; $i++) {
+      $node = fiftyone_degrees_read_node($node_indexs[$i], $headers);
+      $sorted_nodes[$i] = $node['node_ranked_signature_count'];
+      $nodes[] = $node;
     }
-    $linked_list->moveNext();
+    // Sort nodes in ascending order by signature count.
+    array_multisort($sorted_nodes, SORT_ASC, $nodes);
+
+    $timings['closest_match_node_sort_time'] = microtime(TRUE) - $timings['closest_match_node_sort_time'];
+
+    $timings['closest_match_node_fill_signatures_time'] = microtime(TRUE);
+    for ($i = 0; $i < $node_count; $i++) {
+      fiftyone_degrees_fill_node_ranked_signatures($nodes[$i]);
+    }
+    $timings['closest_match_node_fill_signatures_time'] = microtime(TRUE) - $timings['closest_match_node_fill_signatures_time'];
+
+    $timings['closest_match_filling_linked_list_time'] = microtime(TRUE);
+
+    // Building initial list.
+    $linked_list = new LinkedList();
+    if (count($nodes) > 0) {
+      $node_0_signatures_count = count($nodes[0]['node_ranked_signatures']);
+      if ($node_0_signatures_count > $headers['info']['max_signatures']) {
+      //  $node_0_signatures_count = $headers['info']['max_signatures'];
+      }
+      for ($i = 0; $i < $node_0_signatures_count; $i++) {
+        $linked_list->addLast(array($nodes[0]['node_ranked_signatures'][$i], 1));
+      }
+    }
+
+    // Count the number of times each signature index occurs.
+    for ($i = 1; $i < $node_count; $i++) {
+      $max_count = fiftyone_degrees_get_closest_signatures_for_node(
+        $node_count,
+        $nodes[$i]['node_ranked_signatures'],
+        $linked_list,
+        $max_count,
+        $iteration,
+        $headers);
+      $iteration++;
+    }
+    $timings['closest_match_filling_linked_list_time'] = microtime(TRUE) - $timings['closest_match_filling_linked_list_time'];
+    $timings['closest_match_sorting_signature_ranks'] = microtime(TRUE);
+
+    $sig_offsets = array();
+    $linked_list->current = $linked_list->first;
+    
+    while ($linked_list->current !== -1) {
+      if ($linked_list->current->value[1] == $max_count) {
+        $debug_info['signatures_read']++;
+        $sig_offsets[] = $linked_list->current->value[0];
+      }
+      $linked_list->moveNext();
+    }
+
+    $timings['closest_match_sorting_signature_ranks'] = microtime(TRUE) - $timings['closest_match_sorting_signature_ranks'];
+    return $sig_offsets;
   }
-  array_multisort($ranks, SORT_ASC, $sig_offsets);
-
-  $timings['closest_match_sorting_signature_ranks'] = microtime(TRUE) - $timings['closest_match_sorting_signature_ranks'];
-
-  return $sig_offsets;
 }
 
 /**
@@ -1464,9 +1496,13 @@ function fiftyone_degrees_get_closest_signatures_for_node(
   $signature_index_list, 
   $linked_list, 
   $max_count,
-  $iteration) {
+  $iteration,
+  $headers) {
 
   $signature_index_count = count($signature_index_list);
+  if ($signature_index_count > $headers['info']['max_signatures']) {
+  //  $signature_index_count > $headers['info']['max_signatures'];
+  }
   // If there is point adding any new signature indexes set the
   // threshold reached indicator. New signatures won't be added
   // and ones with counts lower than maxcount will be removed.
@@ -1635,7 +1671,6 @@ function fiftyone_degrees_signature_binary_seach(
   $lower = 0;
   $upper = $headers['signatures_count'] - 1;
   $middle = 0;
-
   while ($lower <= $upper) {
     $debug_info['signatures_read']++;
     $middle = $lower + (int) (($upper - $lower) / 2);
@@ -1643,8 +1678,9 @@ function fiftyone_degrees_signature_binary_seach(
     $comparison_result = fiftyone_degrees_compare_signature_to_node_indexs(
       $signature,
       $node_indexs);
-    if ($comparison_result == 0)
+    if ($comparison_result == 0) {
       return $middle;
+    }
     elseif ($comparison_result > 0)
       $upper = $middle - 1;
     else
@@ -1822,8 +1858,6 @@ function fiftyone_degrees_read_signature($index, $headers) {
 
   $_fiftyone_degrees_data_file
     = fiftyone_degrees_get_data_file($signature['file_offset']);
-  $signature['rank']
-    = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
 
   $signature['profile_indexs'] = array();
   for ($i = 0; $i < $headers['info']['signature_profiles_count']; $i++) {
@@ -1982,7 +2016,7 @@ function fiftyone_degrees_read_ascii($offset, $headers) {
   $_fiftyone_degrees_data_file
     = fiftyone_degrees_get_data_file($headers['ascii_strings_offset'] + $offset);
   $length = fiftyone_degrees_read_short($_fiftyone_degrees_data_file);
-  if ($length == 0) {
+  if ($length <= 1) {
     $ascii_string = '';
   }
   else {
@@ -2177,7 +2211,7 @@ function fiftyone_degrees_read_node($offset, $headers) {
     = fiftyone_degrees_read_short($_fiftyone_degrees_data_file);
   $node['numeric_children_count']
     = fiftyone_degrees_read_short($_fiftyone_degrees_data_file);
-  $node['node_signature_count']
+  $node['node_ranked_signature_count']
     = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
 
   $node['node_indexs_offset'] = ftell($_fiftyone_degrees_data_file);
@@ -2185,7 +2219,7 @@ function fiftyone_degrees_read_node($offset, $headers) {
     = $node['node_indexs_offset']
     + ($node['node_index_count'] * (1 + 4 + 4));
 
-  $node['node_signature_offset']
+  $node['node_ranked_signature_offset']
     = $node['node_numeric_children_offset']
     + ($node['numeric_children_count'] * (2 + 4));
 
@@ -2322,30 +2356,22 @@ function fiftyone_degrees_get_nodes_root_node($node_offset, $headers) {
  * @param array &$node
  *   The node to fill.
  */
-function fiftyone_degrees_fill_node_signatures(&$node) {
-  $_fiftyone_degrees_data_file = fiftyone_degrees_get_data_file($node['node_signature_offset']);
-  if (!isset($node['node_signatures'])) {
-    $node['node_signatures'] = array();
+function fiftyone_degrees_fill_node_ranked_signatures(&$node, $limit = 0) {
+  $_fiftyone_degrees_data_file = fiftyone_degrees_get_data_file($node['node_ranked_signature_offset']);
+  if (!isset($node['node_ranked_signatures'])) {
+    $node['node_ranked_signatures'] = array();
 
-    $amount = $node['node_signature_count'];
-    $bytes = fread($_fiftyone_degrees_data_file, 4 * $amount);
-    $byte_count = strlen($bytes);
-    for ($i = 0; $i < $byte_count; $i += 4) {
-
-      $node['node_signatures'][] = unpack('l', substr($bytes, $i, 4))[1];
+    if ($limit == 0) {
+      $limit = $node['node_ranked_signature_count'];
     }
-
-
-    // for ($node_sig_index = 0; $node_sig_index < $node['node_signature_count']; $node_sig_index++) {
-       // $bytes = fread($_fiftyone_degrees_data_file, 4);
-      // $value = unpack('l', $bytes);
-
-       // $node['node_signatures'][] = $value[1];
-      // //$node['node_signatures'][] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
-    // }
+    for ($node_sig_index = 0; $node_sig_index < $limit; $node_sig_index++) {
+      $bytes = fread($_fiftyone_degrees_data_file, 4);
+      $value = unpack('l', $bytes);
+      $node['node_ranked_signatures'][] = $value[1];
+    }
     fiftyone_degrees_save_to_cache('node:'.$node['offset'], $node);
   }
-  return $node['node_signature_count'];
+  return $node['node_ranked_signature_count'];
 }
 
 /**
@@ -2423,6 +2449,13 @@ function fiftyone_degrees_get_profile_from_id($profile_id, $headers) {
 }
 
 /**
+ * Gets the version of the 51Degrees data file this API supports as a string.
+ */
+function fiftyone_degrees_get_supported_version() {
+  return '3.1';
+}
+
+/**
  * Reads the headers of the data file to be used throughout the detection.
  *
  * @return array
@@ -2433,9 +2466,10 @@ function fiftyone_degrees_get_headers() {
   $headers['data_file_path'] = $_fiftyone_degrees_data_file_path;
   $_fiftyone_degrees_data_file = fiftyone_degrees_get_data_file(0);
   $headers['info'] = fiftyone_degrees_get_data_info($_fiftyone_degrees_data_file);
-  
-  if (($headers['info']['major_version'] === 3 && $headers['info']['minor_version'] === 0 &&
-    $headers['info']['build_version'] === 4) == FALSE) {
+
+  $version = "{$headers['info']['major_version']}.{$headers['info']['minor_version']}";
+  $supported_version = fiftyone_degrees_get_supported_version();
+  if ($version !== $supported_version) {
     die('An incompatible data file has been supplied. Ensure the lastest 51Degrees data and api are being used.');
   }
 
@@ -2446,7 +2480,7 @@ function fiftyone_degrees_get_headers() {
   $headers['component_offset'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['component_length'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['component_count'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
-  
+
   $headers['map_offset'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['map_length'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['map_count'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
@@ -2466,6 +2500,10 @@ function fiftyone_degrees_get_headers() {
   $headers['signatures_offset'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['signatures_length'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['signatures_count'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
+  
+  $headers['ranked_signatures_offset'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
+  $headers['ranked_signatures_length'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
+  $headers['ranked_signatures_count'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
 
   $headers['node_offset'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['node_length'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
@@ -2478,9 +2516,9 @@ function fiftyone_degrees_get_headers() {
   $headers['profile_offsets_offset'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['profile_offsets_length'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $headers['profile_offsets_count'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
-  
+
   return $headers;
-  
+
 }
 
 /**
@@ -2521,7 +2559,7 @@ function fiftyone_degrees_get_data_info(&$_fiftyone_degrees_data_file) {
   $info['min_ua_length'] = fiftyone_degrees_read_short($_fiftyone_degrees_data_file);
   $info['lowest_character'] = fiftyone_degrees_read_byte($_fiftyone_degrees_data_file);
   $info['highest_character'] = fiftyone_degrees_read_byte($_fiftyone_degrees_data_file);
-  $info['maximum_patterns'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
+  $info['max_signatures'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $info['signature_profiles_count'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $info['signature_nodes_count'] = fiftyone_degrees_read_int($_fiftyone_degrees_data_file);
   $info['max_values_count'] = fiftyone_degrees_read_short($_fiftyone_degrees_data_file);
