@@ -9,6 +9,10 @@
         {
             "name": "Edmundo Fuentes",
             "email": "me@edmundofuentes.com"
+        },
+        {
+            "name": "Juan Paulo Lara",
+            "email": "jplarar@gmail.com"
         }
     ],
     "minimum-stability": "dev",
